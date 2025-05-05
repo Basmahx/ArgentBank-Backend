@@ -9,6 +9,7 @@ basePath: /api/v1
 schemes:
   - http
 paths:
+  # User Module Endpoints
   /user/login:
     post:
       tags:
@@ -67,8 +68,6 @@ paths:
         - User Module
       summary: User Profile API
       description: API for fetching a user profile
-      produces:
-        - application/json
       responses:
         "200":
           description: User profile retrieved successfully
@@ -78,7 +77,6 @@ paths:
           description: Invalid Fields
         "500":
           description: Internal Server Error
-
     put:
       security:
         - Bearer: []
@@ -105,102 +103,105 @@ paths:
         "500":
           description: Internal Server Error
 
-  /transactions:
+  # Transaction Module Endpoints
+  /user/account/{accountId}/transactions:
     get:
-      summary: Obtenir toutes les transactions du mois en cours, groupées par compte
-      description: Retourne la liste des transactions de l'utilisateur pour le mois en cours, organisées par compte.
-      produces:
-        - application/json
+      security:
+        - Bearer: []
+      tags:
+        - Transaction Module
+      summary: Get all transactions for an account
+      description: Returns a list of transactions for a given account
       parameters:
-        - name: userId
-          in: query
-          required: true
-          type: string
-          description: ID de l'utilisateur
-      responses:
-        "200":
-          description: Succès - Retourne la liste des transactions groupées
-        "401":
-          description: Non autorisé
-        "500":
-          description: Erreur serveur
-
-  /transactions/{transactionId}:
-    get:
-      summary: Obtenir les détails d'une transaction
-      description: Retourne les détails d'une transaction spécifique
-      produces:
-        - application/json
-      parameters:
-        - name: transactionId
+        - name: accountId
           in: path
           required: true
           type: string
-          description: ID de la transaction
+      produces:
+        - application/json
       responses:
         "200":
-          description: Succès - Retourne les détails de la transaction
+          description: List of transactions
+          schema:
+            type: array
+            items:
+              $ref: "#/definitions/Transaction"
         "404":
-          description: Transaction non trouvée
+          description: Account not found
         "500":
-          description: Erreur serveur
+          description: Internal Server Error
 
-    put:
-      summary: Modifier la catégorie ou la note d'une transaction
-      description: Met à jour la catégorie ou la note d'une transaction existante
-      produces:
-        - application/json
+  /user/account/{accountId}/transaction/{transactionId}:
+    get:
+      security:
+        - Bearer: []
+      tags:
+        - Transaction Module
+      summary: Get transaction details
+      description: Get type, category, and note for a specific transaction
       parameters:
+        - name: accountId
+          in: path
+          required: true
+          type: string
         - name: transactionId
           in: path
           required: true
           type: string
-          description: ID de la transaction
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Transaction details
+          schema:
+            $ref: "#/definitions/TransactionDetails"
+        "404":
+          description: Transaction not found
+        "500":
+          description: Internal Server Error
+    put:
+      security:
+        - Bearer: []
+      tags:
+        - Transaction Module
+      summary: Update Transaction Details
+      description: Update the category or note of a specific transaction
+      parameters:
+        - name: accountId
+          in: path
+          required: true
+          type: string
+        - name: transactionId
+          in: path
+          required: true
+          type: string
         - in: body
           name: body
-          description: Champs à modifier (catégorie et/ou note)
           required: true
           schema:
             $ref: "#/definitions/TransactionUpdate"
-      responses:
-        "200":
-          description: Transaction mise à jour avec succès
-        "400":
-          description: Données invalides
-        "404":
-          description: Transaction non trouvée
-        "500":
-          description: Erreur serveur
-
-  /transactions/{transactionId}/note:
-    delete:
-      summary: Supprimer la note d'une transaction
-      description: Permet de supprimer uniquement la note d'une transaction sans affecter les autres informations.
       produces:
         - application/json
-      parameters:
-        - name: transactionId
-          in: path
-          required: true
-          type: string
-          description: ID de la transaction
       responses:
         "200":
-          description: Note supprimée avec succès
+          description: Transaction updated successfully
+          schema:
+            $ref: "#/definitions/ApiResponse"
+        "400":
+          description: Invalid input
         "404":
-          description: Transaction non trouvée
+          description: Transaction not found
         "500":
-          description: Erreur serveur
+          description: Internal Server Error
 
 securityDefinitions:
   Bearer:
     type: apiKey
-    name: Authorization
     in: header
+    name: Authorization
 
 definitions:
   User:
-    type: object
     properties:
       email:
         type: string
@@ -219,7 +220,6 @@ definitions:
         description: user public name
 
   Login:
-    type: object
     properties:
       email:
         type: string
@@ -255,10 +255,79 @@ definitions:
       userName:
         type: string
 
+  AccountTransactionsResponse:
+    type: object
+    properties:
+      status:
+        type: integer
+      message:
+        type: string
+      body:
+        type: array
+        items:
+          type: object
+          properties:
+            id:
+              type: string
+            description:
+              type: string
+            amount:
+              type: number
+            type:
+              type: string
+              enum: [debit, credit]
+            date:
+              type: string
+              format: date-time
+            category:
+              type: string
+
+  Transaction:
+    type: object
+    properties:
+      id:
+        type: string
+      date:
+        type: string
+        format: date
+      description:
+        type: string
+      amount:
+        type: number
+        format: float
+      balance:
+        type: number
+        format: float
+
+  TransactionDetails:
+    allOf:
+      - $ref: "#/definitions/AccountTransactionsResponse/body/items"
+      - type: object
+        properties:
+          type:
+            type: string
+            description: e.g., electronic, check, wire
+          category:
+            type: string
+            description: e.g., Groceries, Utilities, etc.
+          note:
+            type: string
+            description: Optional user note
+
   TransactionUpdate:
     type: object
     properties:
       category:
         type: string
+        enum:
+          - Groceries
+          - Utilities
+          - Rent
+          - Entertainment
+          - Travel
+          - Health
+          - Other
+        description: Must be one of the predefined categories
       note:
         type: string
+        description: Optional note. Send empty string to delete.
